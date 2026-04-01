@@ -33,7 +33,9 @@ namespace virtualization
 
 	void HandleCr3Exit()
 	{
-		uint64_t rdtsc_offset = 0x77; 
+		uint64_t rdtsc_start = __rdtsc();
+		uint64_t rdtsc_end = __rdtsc();
+		uint64_t rdtsc_offset = rdtsc_end - rdtsc_start + 0x77; 
 		return;
 	}
 
@@ -51,13 +53,14 @@ namespace virtualization
 
 	bool VmxProvider::VirtualizeRDTSC(uint64_t& val)
 	{
-		val -= 1000; 
+		uint64_t vm_exit_overhead = 1000; 
+		val -= vm_exit_overhead;
 		return true;
 	}
 
 	bool VmxProvider::VirtualizeMSR(uint32_t msr, uint64_t& val)
 	{
-		if (msr == 0x3A) val &= ~(1 << 2); 
+		if (msr == 0x3A) val &= ~(1ULL << 2); 
 		if (msr >= 0x480 && msr <= 0x491) val = 0; 
 		return true;
 	}
