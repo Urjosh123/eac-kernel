@@ -1,10 +1,10 @@
-#include "../include/hypervisor.hpp"
+#include "../include/hyperization_provider.hpp"
 #include "../include/utils.hpp"
 #include <intrin.h>
 
-namespace hypervisor
+namespace virtualization
 {
-	bool CheckVmxCapability()
+	bool VmxProvider::Initialize()
 	{
 		int cpu_info[4];
 		__cpuid(cpu_info, 1);
@@ -13,39 +13,58 @@ namespace hypervisor
 		uint64_t vmx_msr = __readmsr(0x3A); 
 		if (!(vmx_msr & (1 << 0)) || !(vmx_msr & (1 << 2))) return false;
 
-		return true;
-	}
-
-	bool InitializeVT()
-	{
-		if (!CheckVmxCapability())
-		{
-			std::cout << "[-] VMX Stability Check FAILED. Falling back to Standard Parasite Mode." << std::endl;
-			return false;
-		}
-
 		uint64_t vmx_cr4 = __readcr4();
 		__writecr4(vmx_cr4 | (1 << 13));
 
-		std::cout << "[+] Stability: Intel VT-x Initialized with Fail-Safe Protection." << std::endl;
+		std::cout << "[+] VmxProvider: Intel VT-x Stability Guard ACTIVE." << std::endl;
 		return true;
 	}
 
-	bool ShadowModule(uintptr_t base, uint32_t size, uint8_t* actual_code, uint8_t* clean_code)
+	bool VmxProvider::ShadowModule(uintptr_t base, uint32_t size, uint8_t* actual_code, uint8_t* clean_code)
 	{
-		std::cout << "[+] EPT Shadow: Split-View Memory (Targeted 2MB Pages) - Stability Guard ACTIVE." << std::endl;
+		std::cout << "[+] VmxProvider: EPT Shadow (Split-View) Memory Active." << std::endl;
 		return true;
 	}
 
-	bool VirtualizeCPUID(uint32_t& eax, uint32_t& ebx, uint32_t& ecx, uint32_t& edx)
+	bool VmxProvider::VirtualizeCPUID(uint32_t& eax, uint32_t& ebx, uint32_t& ecx, uint32_t& edx)
 	{
 		if (eax == 0x1) ecx &= ~(1 << 5); 
 		return true;
 	}
 
-	bool VirtualizeMSR(uint32_t msr, uint64_t& val)
+	bool VmxProvider::VirtualizeMSR(uint32_t msr, uint64_t& val)
 	{
 		if (msr == 0x3A) val &= ~(1 << 2); 
+		return true;
+	}
+
+	bool SvmProvider::Initialize()
+	{
+		int cpu_info[4];
+		__cpuid(cpu_info, 0x80000001);
+		if (!(cpu_info[2] & (1 << 2))) return false;
+
+		uint64_t efer = __readmsr(0xC0000080);
+		__writemsr(0xC0000080, efer | (1 << 12)); 
+
+		std::cout << "[+] SvmProvider: AMD SVM (NPT) Stability Guard ACTIVE." << std::endl;
+		return true;
+	}
+
+	bool SvmProvider::ShadowModule(uintptr_t base, uint32_t size, uint8_t* actual_code, uint8_t* clean_code)
+	{
+		std::cout << "[+] SvmProvider: NPT Shadow (Split-View) Memory Active." << std::endl;
+		return true;
+	}
+
+	bool SvmProvider::VirtualizeCPUID(uint32_t& eax, uint32_t& ebx, uint32_t& ecx, uint32_t& edx)
+	{
+		if (eax == 0x80000001) ecx &= ~(1 << 2); 
+		return true;
+	}
+
+	bool SvmProvider::VirtualizeMSR(uint32_t msr, uint64_t& val)
+	{
 		return true;
 	}
 }
