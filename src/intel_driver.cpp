@@ -10,6 +10,21 @@
 
 #define INTEL_IOCTL_COPY_MEMORY 0x80862007
 
+typedef struct _PHYSICAL_ADDRESS {
+	union {
+		struct {
+			ULONG LowPart;
+			LONG HighPart;
+		} DUMMYSTRUCTNAME;
+		LONGLONG QuadPart;
+	} DUMMYUNIONNAME;
+} PHYSICAL_ADDRESS, *PPHYSICAL_ADDRESS;
+
+extern "C" NTSTATUS NTAPI NtQueryIntervalProfile(
+	IN ULONG ProfileSource,
+	OUT PULONG Interval
+);
+
 namespace intel_driver
 {
 	void InstantCleanup();
