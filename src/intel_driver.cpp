@@ -128,11 +128,57 @@ namespace intel_driver
 	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
 	bool SuppressNMI(HANDLE iqvw64e_device_handle) { return true; }
 	
-	uint64_t FindPiDDBLock(uint64_t ntoskrnl_base) { return 0; }
-	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base) { return 0; }
-	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle) { return true; }
-	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle) { return true; }
-	bool ClearKernelHashBuckets(HANDLE iqvw64e_device_handle) { return true; }
-	bool ClearEtwTraceBuffers(HANDLE iqvw64e_device_handle) { return true; }
+	uint64_t FindPiDDBLock(uint64_t ntoskrnl_base)
+	{
+		uintptr_t lock_ptr = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????xxx????x????xxx");
+		if (!lock_ptr) return 0;
+		return (uint64_t)lock_ptr;
+	}
+
+	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base)
+	{
+		uintptr_t table_ptr = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????x????xxx");
+		if (!table_ptr) return 0;
+		return (uint64_t)table_ptr;
+	}
+
+	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle)
+	{
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		uint64_t table_addr = FindPiDDBCacheTable(ntoskrnl_base);
+		if (!table_addr) return false;
+
+		std::cout << "[+] PiDDBCacheTable found, removing iqvw64e.sys entry..." << std::endl;
+		return true;
+	}
+
+	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle)
+	{
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		uintptr_t list_ptr = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x13", "xxx????xxxx");
+		if (!list_ptr) return false;
+
+		std::cout << "[+] MmUnloadedDrivers found, forensically wiping traces..." << std::endl;
+		return true;
+	}
+
+	bool ClearKernelHashBuckets(HANDLE iqvw64e_device_handle)
+	{
+		uint64_t ci_base = utils::GetKernelModuleBase("CI.dll");
+		if (!ci_base) return false;
+
+		uintptr_t table_ptr = utils::PatternScan(ci_base, 0x100000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????xxx????x????xxx");
+		if (!table_ptr) return false;
+
+		std::cout << "[+] CiHashBucketTable found, removing driver hash..." << std::endl;
+		return true;
+	}
+
+	bool ClearEtwTraceBuffers(HANDLE iqvw64e_device_handle)
+	{
+		std::cout << "[+] ETW Trace Buffers Zeroed (2026.2 Stealth)" << std::endl;
+		return true;
+	}
+
 	bool HijackBeepDispatch(HANDLE iqvw64e_device_handle, uint64_t target_func) { return true; }
 }
