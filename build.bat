@@ -1,25 +1,29 @@
 @echo off
-setlocal enabledelayedexpansion
 
-:: 1. Search for MSVC environment
+:: 1. Is cl.exe already in path?
 where cl >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [+] MSVC not in PATH. Searching for local installation...
-    
-    set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Community"
-    if not exist "!VS_PATH!" set "VS_PATH=C:\Program Files (x86)\Microsoft Visual Studio\2022\Community"
-    
-    if exist "!VS_PATH!\VC\Auxiliary\Build\vcvars64.bat" (
-        echo [+] Found MSVC 2022 at !VS_PATH!. Configuring environment...
-        call "!VS_PATH!\VC\Auxiliary\Build\vcvars64.bat" >nul
-    ) else (
-        echo [-] MSVC compiler (cl.exe) not found.
-        echo [!] Please run this from a 'Developer Command Prompt' or install Visual Studio.
-        pause
-        exit /b
+if %errorlevel% equ 0 goto :BUILD
+
+:: 2. Try using vswhere
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
+
+if exist "%VSWHERE%" (
+    for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -property installationPath`) do set "VS_INSTALL_PATH=%%i"
+    if defined VS_INSTALL_PATH (
+        if exist "%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvars64.bat" (
+            call "%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvars64.bat" >nul
+            goto :BUILD
+        )
     )
 )
 
+echo [-] MSVC compiler not found.
+echo [!] Please run this from a 'Developer Command Prompt' or install C++ build tools in Visual Studio.
+pause
+exit /b
+
+:BUILD
 echo [+] Compiling mapper (Windows 10/11 20H2+)...
 
 cl.exe /nologo /O2 /MT /W3 /std:c++17 /I./include ^
