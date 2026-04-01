@@ -24,11 +24,18 @@ namespace parasite_utils
 					
 					if (lower_name == "null.sys" || lower_name == "luafv.sys" || lower_name == "vmsidebyside.sys")
 					{
-						out_host.base = (uintptr_t)drivers[i];
-						out_host.name = name;
-						out_host.size = 0x80000; 
-						std::cout << "[+] Parasite Host Found: " << name << " (0x" << std::hex << out_host.base << ")" << std::dec << std::endl;
-						return true;
+						MODULEINFO mod_info;
+						if (GetModuleInformation(GetCurrentProcess(), (HMODULE)drivers[i], &mod_info, sizeof(mod_info)))
+						{
+							if (mod_info.SizeOfImage >= min_size)
+							{
+								out_host.base = (uintptr_t)drivers[i];
+								out_host.name = name;
+								out_host.size = mod_info.SizeOfImage;
+								std::cout << "[+] Parasite Host Optimized: " << name << " (Size: 0x" << std::hex << out_host.size << ")" << std::dec << std::endl;
+								return true;
+							}
+						}
 					}
 				}
 			}
