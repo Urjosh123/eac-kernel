@@ -40,11 +40,7 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 	
 	if (target_base == 0)
 	{
-		std::random_device rd;
-		std::mt19937 g(rd());
-		uint32_t random_tag = legit_tags[std::uniform_int_distribution<size_t>(0, legit_tags.size() - 1)(g)];
-		target_base = (uintptr_t)intel_driver::AllocatePool(iqvw64e_device_handle, pe_file.size_of_image, random_tag);
-		intel_driver::ClearBigPoolTable(iqvw64e_device_handle, (uint64_t)target_base);
+		target_base = (uintptr_t)intel_driver::AllocatePhysicalMemory(iqvw64e_device_handle, pe_file.size_of_image);
 	}
 
 	if (target_base == 0) return false;
@@ -70,9 +66,9 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 	intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle);
 	intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle);
 
-	intel_driver::HijackBeepDispatch(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point);
+	intel_driver::ExecuteViaIPI(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point);
 
-	std::cout << "[!] Mapper clean, active in RAM." << std::endl;
+	std::cout << "[!] Mapper clean, active in RAM (Max UD Protection)." << std::endl;
 	return true;
 }
 

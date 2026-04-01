@@ -29,8 +29,10 @@ namespace intel_driver
 	
 	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...);
 	
-	uint64_t AllocatePool(HANDLE iqvw64e_device_handle, uint32_t size, uint32_t tag = 'mdkd');
+	uintptr_t AllocatePhysicalMemory(HANDLE iqvw64e_device_handle, uint32_t size);
 	bool FreePool(HANDLE iqvw64e_device_handle, uint64_t address);
+	
+	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address);
 	
 	uint64_t FindPiDDBLock(uint64_t ntoskrnl_base);
 	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base);
