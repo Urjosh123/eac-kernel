@@ -41,8 +41,9 @@ cl.exe /nologo /O2 /MT /W3 /std:c++17 /I./include ^
     src/intel_driver.cpp ^
     src/portable_executable.cpp ^
     src/utils.cpp ^
+    src/vad_utils.cpp ^
     /Fe:mapper.exe ^
-    /link /SUBSYSTEM:CONSOLE /MACHINE:X64 Psapi.lib ntdll.lib
+    /link /SUBSYSTEM:CONSOLE /MACHINE:X64 Psapi.lib ntdll.lib Advapi32.lib
 
 if %errorlevel% equ 0 (
     echo [+] Build successful: mapper.exe
