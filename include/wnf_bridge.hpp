@@ -1,5 +1,4 @@
 #pragma once
-#include <iostream>
 #include <string>
 #include <vector>
 #include <Windows.h>
@@ -14,5 +13,6 @@ namespace wnf_bridge
 	bool SendCommand(uint32_t cmd, uint64_t data);
 	bool ReceiveResponse(uint64_t& data);
 	
+	bool Execute(uint64_t function_address, uint64_t rcx);
 	bool ClearWnfTraces();
 }

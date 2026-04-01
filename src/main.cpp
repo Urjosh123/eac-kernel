@@ -1,4 +1,3 @@
-#include <iostream>
 #include <string>
 #include <vector>
 #include <Windows.h>
@@ -10,55 +9,33 @@
 
 int main(int argc, char* argv[])
 {
-	if (argc < 2)
-	{
-		std::cout << "[-] Usage: mapper.exe <driver.sys> [--hijack]" << std::endl;
-		system("pause");
-		return -1;
-	}
+	if (argc < 2) return 1;
 
-	std::string driver_path = argv[1];
-	bool use_hijack = false;
-	if (argc > 2 && std::string(argv[2]) == "--hijack")
-		use_hijack = true;
+	std::string p = argv[1];
+	bool h = (argc > 3); 
 
-	if (!utils::FileExists(driver_path))
-	{
-		std::cout << "[-] Driver file not found: " << driver_path << std::endl;
-		return -1;
-	}
+	std::vector<uint8_t> b;
+	if (!utils::ReadFileToBuffer(p, b)) return 2;
 
-	std::cout << "[+] Loading vulnerable driver..." << std::endl;
-	
 	if (!intel_driver::IsLoaded()) {
 		if (!intel_driver::Load()) {
-			std::cout << "[-] Failed to load vulnerable driver" << std::endl;
 			return -1;
 		}
 	}
 
-	std::cout << "[+] Mapping driver..." << std::endl;
-
-	HANDLE iqvw64e_device_handle = intel_driver::Open();
-	if (iqvw64e_device_handle == INVALID_HANDLE_VALUE)
+	HANDLE h_dev = intel_driver::Open();
+	if (h_dev == INVALID_HANDLE_VALUE)
 	{
-		std::cout << "[-] Failed to open handle to vulnerable driver" << std::endl;
 		intel_driver::Unload();
 		return -1;
 	}
 
-	if (!kdmapper::MapDriver(iqvw64e_device_handle, driver_path, use_hijack))
+	if (!kdmapper::MapDriver(h_dev, p, h))
 	{
-		std::cout << "[-] Failed to map driver" << std::endl;
 		intel_driver::Unload();
-		return -1;
+		return 5;
 	}
-
-	std::cout << "[+] Driver mapped successfully. Cleaning up..." << std::endl;
 
 	intel_driver::Unload();
-
-	std::cout << "[+] Finished!" << std::endl;
-	system("pause");
 	return 0;
 }

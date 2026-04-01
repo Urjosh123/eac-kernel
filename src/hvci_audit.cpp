@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+#include <Windows.h>
 #include "../include/hvci_audit.hpp"
 #include "../include/utils.hpp"
 #include "../include/intel_driver.hpp"
@@ -19,18 +22,14 @@ namespace hvci_audit
 		uint64_t slat_base = FindSlatBase();
 		if (!slat_base)
 		{
-			std::cout << "[-] HVCI Audit: Failed to locate System SLAT base. Aborting." << std::endl;
 			return false;
 		}
 
-		std::cout << "[+] HVCI Audit: System SLAT Base found at 0x" << std::hex << slat_base << std::dec << std::endl;
-		std::cout << "[+] HVCI Audit: Performing Read-Only Ghost Walk of host module memory..." << std::endl;
 
 		for (uint32_t i = 0; i < host_size; i += 0x1000)
 		{
 			uint64_t target_gpa = host_base + i;
 			
-			if (i == 0) std::cout << "[+] HVCI Audit: Ghost Walk Complete. All 4-level table entries are consistent." << std::endl;
 		}
 		
 		return true;

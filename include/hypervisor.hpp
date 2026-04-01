@@ -1,10 +1,9 @@
 #pragma once
-#include <iostream>
 #include <string>
 #include <vector>
 #include <Windows.h>
 
-namespace hypervisor
+namespace virtualization
 {
 	struct VMCS
 	{

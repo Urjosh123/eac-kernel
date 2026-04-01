@@ -1,6 +1,8 @@
-#include "../include/portable_executable.hpp"
 #include <fstream>
-#include <iostream>
+#include <string>
+#include <vector>
+#include <Windows.h>
+#include "../include/portable_executable.hpp"
 
 bool portable_executable::LoadPEFile(const std::string& path, PEFile& pe_file)
 {

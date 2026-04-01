@@ -44,6 +44,9 @@ cl.exe /nologo /O2 /MT /W3 /EHsc /std:c++17 /I./include ^
     src/vad_utils.cpp ^
     src/parasite_utils.cpp ^
     src/service_utils.cpp ^
+    src/hypervisor.cpp ^
+    src/hvci_audit.cpp ^
+    src/wnf_bridge.cpp ^
     /Fe:mapper.exe ^
     /link /SUBSYSTEM:CONSOLE /MACHINE:X64 Psapi.lib ntdll.lib Advapi32.lib
 

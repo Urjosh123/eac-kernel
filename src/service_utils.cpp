@@ -1,5 +1,4 @@
 #include "../include/service_utils.hpp"
-#include <iostream>
 #include <Windows.h>
 
 bool service_utils::ServiceManager::RegisterDriver(const std::string& service_name, const std::string& driver_path)
