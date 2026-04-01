@@ -24,25 +24,11 @@ namespace parasite_utils
 					
 					if (lower_name == "null.sys" || lower_name == "luafv.sys" || lower_name == "vmsidebyside.sys")
 					{
-						char driver_path[MAX_PATH];
-						if (GetDeviceDriverFileNameA(drivers[i], driver_path, sizeof(driver_path)))
-						{
-							std::vector<uint8_t> driver_data;
-							if (utils::ReadFileToBuffer(driver_path, driver_data))
-							{
-								PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)driver_data.data();
-								PIMAGE_NT_HEADERS64 nt = (PIMAGE_NT_HEADERS64)(driver_data.data() + dos->e_lfanew);
-								
-								if (nt->OptionalHeader.SizeOfImage >= min_size)
-								{
-									out_host.base = (uintptr_t)drivers[i];
-									out_host.name = name;
-									out_host.size = nt->OptionalHeader.SizeOfImage;
-									std::cout << "[+] Parasite Host Hardened: " << name << " (0x" << std::hex << out_host.size << " bytes)" << std::dec << std::endl;
-									return true;
-								}
-							}
-						}
+						out_host.base = (uintptr_t)drivers[i];
+						out_host.name = name;
+						out_host.size = 0x80000; 
+						std::cout << "[+] Parasite Host Found: " << name << " (0x" << std::hex << out_host.base << ")" << std::dec << std::endl;
+						return true;
 					}
 				}
 			}
