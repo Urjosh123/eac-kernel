@@ -35,7 +35,7 @@ exit /b
 :BUILD
 echo [+] Compiling mapper...
 
-cl.exe /nologo /O2 /MT /W3 /std:c++17 /I./include ^
+cl.exe /nologo /O2 /MT /W3 /EHsc /std:c++17 /I./include ^
     src/main.cpp ^
     src/kdmapper.cpp ^
     src/intel_driver.cpp ^
