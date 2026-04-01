@@ -5,7 +5,7 @@ eac-kernel is a high-performance, forensically sterile kernel manual mapper desi
 
 ---
 
-## 🏗️ Architectural Hierarchy
+## Architectural Hierarchy
 ```mermaid
 graph TD
     A[Hardware: Intel/AMD CPU] --> B[Ring -1: Spectre Hypervisor]
@@ -17,11 +17,11 @@ graph TD
 
 ---
 
-## 💎 Elite Hardened Features
+## Hardened Features
 
 | Feature | Implementation | Forensic Status |
 | :--- | :--- | :--- |
-| **Virtualization** | VMX Root Mode (Ring -1) | **Ghost Tier** |
+| **Virtualization** | VMX Root Mode (Ring -1) | **Ghost** |
 | **Memory Isolation** | Nested EPT Shadow Paging | **Signatureless** |
 | **Execution Trigger** | WNF Operation Hijack | **Native Context** |
 | **Timing Stealth** | RDTSC Latency Alignment | **Cycle-Matched** |
@@ -29,7 +29,7 @@ graph TD
 
 ---
 
-## 🚀 Deployment Guide
+## Deployment Guide
 > [!IMPORTANT]
 > **Administrative Privileges Required**: This mapper performs low-level hardware virtualization. Ensure you are running from a **Developer Command Prompt** with Administrator permissions.
 
@@ -47,7 +47,7 @@ Provide the target system module (.sys) as a parasitic payload:
 
 ---
 
-## ⚖️ System Compliance
+## System Compliance
 > [!CAUTION]
 > **Production Status**: This software modifies the Root privilege level of the processor. Use only on authorized research systems. **Secure Boot + HVCI (Memory Integrity) Compatible.**
 
@@ -57,4 +57,4 @@ Provide the target system module (.sys) as a parasitic payload:
 - **Compiler**: MSVC v143+ (C++17)
 
 ---
-© 2026 Spectre Research Group. *All forensic signatures have been purged.*
+© 2026 eac-kernel by dog2947. *All forensic signatures have been purged.*
