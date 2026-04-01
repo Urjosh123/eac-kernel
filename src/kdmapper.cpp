@@ -80,8 +80,11 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 
 	intel_driver::ExecuteViaIPI(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point);
 
-	bool Relocate(uint8_t* raw_image, uint64_t target_base, uint64_t source_base)
-	{
+	return true;
+}
+
+bool kdmapper::Relocate(uint8_t* raw_image, uint64_t target_base, uint64_t source_base)
+{
 		uint64_t delta = target_base - source_base;
 		if (delta == 0) return true;
 
@@ -111,8 +114,8 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 		return true;
 	}
 
-	bool ResolveImports(HANDLE iqvw64e_device_handle, uint8_t* raw_image)
-	{
+bool kdmapper::ResolveImports(HANDLE iqvw64e_device_handle, uint8_t* raw_image)
+{
 		PIMAGE_DOS_HEADER dos_header = reinterpret_cast<PIMAGE_DOS_HEADER>(raw_image);
 		PIMAGE_NT_HEADERS64 nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS64>(raw_image + dos_header->e_lfanew);
 		PIMAGE_DATA_DIRECTORY import_dir = &nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -141,4 +144,3 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 		std::cout << "[+] IAT Resolver: Kernel imports linked." << std::endl;
 		return true;
 	}
-}

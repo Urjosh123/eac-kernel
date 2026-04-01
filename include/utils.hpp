@@ -11,7 +11,9 @@ namespace utils
 	uint64_t GetKernelModuleBase(const std::string& module_name);
 	uint64_t GetKernelExport(uint64_t module_base, const std::string& export_name);
 	bool ReadFileToBuffer(const std::string& path, std::vector<uint8_t>& buffer);
+	struct Pattern { const char* pattern; const char* mask; };
 	uint64_t PatternScan(uint64_t base, uint32_t size, const char* pattern, const char* mask);
+	uint64_t PatternScanMulti(uint64_t base, uint32_t size, const std::vector<Pattern>& patterns);
 	bool ValidateDriverPE(const std::vector<uint8_t>& buffer);
 	bool IsHVCIEnabled();
 	bool IsSecureBootEnabled();

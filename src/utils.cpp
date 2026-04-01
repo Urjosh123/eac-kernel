@@ -106,6 +106,16 @@ uint64_t utils::PatternScan(uint64_t base, uint32_t size, const char* pattern, c
 	return 0;
 }
 
+uint64_t utils::PatternScanMulti(uint64_t base, uint32_t size, const std::vector<Pattern>& patterns)
+{
+	for (const auto& pattern : patterns)
+	{
+		uint64_t res = PatternScan(base, size, pattern.pattern, pattern.mask);
+		if (res != 0) return res;
+	}
+	return 0;
+}
+
 bool utils::ValidateDriverPE(const std::vector<uint8_t>& buffer)
 {
 	PIMAGE_DOS_HEADER dos_header = (PIMAGE_DOS_HEADER)buffer.data();
