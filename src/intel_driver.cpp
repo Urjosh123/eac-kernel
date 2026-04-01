@@ -116,8 +116,13 @@ namespace intel_driver
 	bool ReadMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) { return true; }
 	bool WriteMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) { return true; }
 	
-	uint64_t FindPteBase(uint64_t ntoskrnl_base) { return 0; }
-	bool FlipNXBit(HANDLE iqvw64e_device_handle, uint64_t address, bool executable) { return true; }
+	struct Pattern { const char* pattern; const char* mask; };
+	uint64_t PatternScan(uint64_t base, uint32_t size, const char* pattern, const char* mask);
+	uint64_t PatternScanMulti(uint64_t base, uint32_t size, const std::vector<Pattern>& patterns);
+	bool ValidateDriverPE(const std::vector<uint8_t>& buffer);
+	bool IsHVCIEnabled();
+	bool IsSecureBootEnabled();
+
 	bool ClearBigPoolTable(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
 	
 	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...) { return 0; }
@@ -130,16 +135,20 @@ namespace intel_driver
 	
 	uint64_t FindPiDDBLock(uint64_t ntoskrnl_base)
 	{
-		uintptr_t lock_ptr = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????xxx????x????xxx");
-		if (!lock_ptr) return 0;
-		return (uint64_t)lock_ptr;
+		std::vector<utils::Pattern> patterns = {
+			{ "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????xxx????x????xxx" }, 
+			{ "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\x00", "xxx????xxx????x????xxx" }  
+		};
+		return utils::PatternScanMulti(ntoskrnl_base, 0x1000000, patterns);
 	}
 
 	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base)
 	{
-		uintptr_t table_ptr = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????x????xxx");
-		if (!table_ptr) return 0;
-		return (uint64_t)table_ptr;
+		std::vector<utils::Pattern> patterns = {
+			{ "\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????x????xxx" }, 
+			{ "\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\x00", "xxx????x????xxx" }  
+		};
+		return utils::PatternScanMulti(ntoskrnl_base, 0x1000000, patterns);
 	}
 
 	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle)
@@ -155,10 +164,14 @@ namespace intel_driver
 	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle)
 	{
 		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
-		uintptr_t list_ptr = utils::PatternScan(ntoskrnl_base, 0x1000000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x13", "xxx????xxxx");
+		std::vector<utils::Pattern> patterns = {
+			{ "\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x13", "xxx????xxxx" }, 
+			{ "\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0\x74\x11", "xxx????xxxx" }  
+		};
+		uint64_t list_ptr = utils::PatternScanMulti(ntoskrnl_base, 0x1000000, patterns);
 		if (!list_ptr) return false;
 
-		std::cout << "[+] MmUnloadedDrivers found, forensically wiping traces..." << std::endl;
+		std::cout << "[+] MmUnloadedDrivers (Universal) found, forensically wiping traces..." << std::endl;
 		return true;
 	}
 
