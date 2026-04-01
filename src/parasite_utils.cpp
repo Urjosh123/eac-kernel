@@ -24,16 +24,23 @@ namespace parasite_utils
 					
 					if (lower_name == "null.sys" || lower_name == "luafv.sys" || lower_name == "vmsidebyside.sys")
 					{
-						MODULEINFO mod_info;
-						if (GetModuleInformation(GetCurrentProcess(), (HMODULE)drivers[i], &mod_info, sizeof(mod_info)))
+						char driver_path[MAX_PATH];
+						if (GetDeviceDriverFileNameA(drivers[i], driver_path, sizeof(driver_path)))
 						{
-							if (mod_info.SizeOfImage >= min_size)
+							std::vector<uint8_t> driver_data;
+							if (utils::ReadFileToBuffer(driver_path, driver_data))
 							{
-								out_host.base = (uintptr_t)drivers[i];
-								out_host.name = name;
-								out_host.size = mod_info.SizeOfImage;
-								std::cout << "[+] Parasite Host Optimized: " << name << " (Size: 0x" << std::hex << out_host.size << ")" << std::dec << std::endl;
-								return true;
+								PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)driver_data.data();
+								PIMAGE_NT_HEADERS64 nt = (PIMAGE_NT_HEADERS64)(driver_data.data() + dos->e_lfanew);
+								
+								if (nt->OptionalHeader.SizeOfImage >= min_size)
+								{
+									out_host.base = (uintptr_t)drivers[i];
+									out_host.name = name;
+									out_host.size = nt->OptionalHeader.SizeOfImage;
+									std::cout << "[+] Parasite Host Hardened: " << name << " (0x" << std::hex << out_host.size << " bytes)" << std::dec << std::endl;
+									return true;
+								}
 							}
 						}
 					}
