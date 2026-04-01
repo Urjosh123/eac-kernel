@@ -8,7 +8,7 @@ eac-kernel is a high-performance, forensically sterile kernel manual mapper desi
 ## Architectural Hierarchy
 ```mermaid
 graph TD
-    A[Hardware: Intel/AMD CPU] --> B[Ring -1: eac-kernel Hypervisor]
+    A[Hardware: Intel/AMD CPU] --> B[Ring -1: EAC-Kernel Hypervisor]
     B --> C[Ring 0: Windows Guest Kernel]
     C --> D[Ring 3: Usermode Applications]
     B -.->|EPT Shadowing| E[Hidden Payload]
