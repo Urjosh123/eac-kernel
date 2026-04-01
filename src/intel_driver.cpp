@@ -142,6 +142,11 @@ namespace intel_driver
 		return utils::PatternScanMulti(ntoskrnl_base, 0x1000000, patterns);
 	}
 
+	bool FlipNXBit(HANDLE iqvw64e_device_handle, uint64_t address, bool executable)
+	{
+		return true;
+	}
+
 	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base)
 	{
 		std::vector<utils::Pattern> patterns = {
