@@ -12,6 +12,7 @@
 
 namespace intel_driver
 {
+	void InstantCleanup();
 	std::string current_driver_name = "iqvw64e.sys";
 	std::string current_service_name = "iqvw64e";
 

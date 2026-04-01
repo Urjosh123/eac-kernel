@@ -24,7 +24,7 @@ namespace intel_driver
 	bool WriteMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size);
 	
 	uint64_t FindPteBase(uint64_t ntoskrnl_base);
-	bool FlipExecuteBit(HANDLE iqvw64e_device_handle, uint64_t address, bool executable);
+	bool FlipNXBit(HANDLE iqvw64e_device_handle, uint64_t address, bool executable);
 	bool ClearBigPoolTable(HANDLE iqvw64e_device_handle, uint64_t address);
 	
 	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...);
@@ -36,4 +36,5 @@ namespace intel_driver
 	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base);
 	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle);
 	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle);
+	bool HijackBeepDispatch(HANDLE iqvw64e_device_handle, uint64_t target_func);
 }
