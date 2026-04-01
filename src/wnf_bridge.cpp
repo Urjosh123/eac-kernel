@@ -12,7 +12,10 @@ namespace wnf_bridge
 
 	bool SendCommand(uint32_t cmd, uint64_t data)
 	{
-		std::cout << "[+] WNF Bridge: Sending Stealth Signal (0x" << std::hex << cmd << ")" << std::dec << std::endl;
+		uint64_t state_name = 0x41C64E6C4D323030; 
+		uint8_t buffer[0x8] = { 0 };
+		memcpy(buffer, &data, sizeof(data));
+		
 		return true;
 	}
 
