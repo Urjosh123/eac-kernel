@@ -16,13 +16,11 @@ namespace virtualization
 		uint64_t vmx_cr4 = __readcr4();
 		__writecr4(vmx_cr4 | (1 << 13));
 
-		std::cout << "[+] VmxProvider: Intel VT-x Stability Guard ACTIVE." << std::endl;
 		return true;
 	}
 
 	bool Initialize(uint64_t physical_memory_base)
 	{
-		std::cout << "[+] VmxProvider: PTE Masking Active." << std::endl;
 		return true;
 	}
 
@@ -39,7 +37,6 @@ namespace virtualization
 
 	bool VmxProvider::ShadowModule(uintptr_t base, uint32_t size, uint8_t* actual_code, uint8_t* clean_code)
 	{
-		std::cout << "[+] VmxProvider: EPT Shadow (Split-View) Memory Active." << std::endl;
 		return true;
 	}
 
@@ -71,13 +68,11 @@ namespace virtualization
 		uint64_t efer = __readmsr(0xC0000080);
 		__writemsr(0xC0000080, efer | (1 << 12)); 
 
-		std::cout << "[+] SvmProvider: AMD SVM (NPT) Stability Guard ACTIVE." << std::endl;
 		return true;
 	}
 
 	bool SvmProvider::ShadowModule(uintptr_t base, uint32_t size, uint8_t* actual_code, uint8_t* clean_code)
 	{
-		std::cout << "[+] SvmProvider: NPT Shadow (Split-View) Memory Active." << std::endl;
 		return true;
 	}
 
