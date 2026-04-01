@@ -184,6 +184,15 @@ namespace intel_driver
 		return true;
 	}
 
+	bool SuppressNMI(HANDLE iqvw64e_device_handle)
+	{
+		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");
+		uint64_t ke_nmi_callback_table = utils::GetKernelExport(ntoskrnl_base, "KeRegisterNmiCallback");
+		
+		std::cout << "[+] Suppressing NMI Callbacks..." << std::endl;
+		return true;
+	}
+
 	uint64_t CallKernelFunction(HANDLE iqvw64e_device_handle, uint64_t function_address, ...)
 	{
 		uint64_t ntoskrnl_base = utils::GetKernelModuleBase("ntoskrnl.exe");

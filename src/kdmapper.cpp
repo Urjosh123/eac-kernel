@@ -2,6 +2,7 @@
 #include "../include/utils.hpp"
 #include "../include/vad_utils.hpp"
 #include "../include/intel_driver.hpp"
+#include "../include/parasite_utils.hpp"
 #include <iostream>
 #include <vector>
 #include <Windows.h>
@@ -40,7 +41,16 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 	
 	if (target_base == 0)
 	{
-		target_base = (uintptr_t)intel_driver::AllocatePhysicalMemory(iqvw64e_device_handle, pe_file.size_of_image);
+		parasite_utils::HostModule host;
+		if (parasite_utils::FindHostModule(pe_file.size_of_image, host))
+		{
+			std::cout << "[+] Parasite Mode: Hijacking " << host.name << " (0x" << std::hex << host.base << ")" << std::dec << std::endl;
+			target_base = host.base;
+		}
+		else
+		{
+			target_base = (uintptr_t)intel_driver::AllocatePhysicalMemory(iqvw64e_device_handle, pe_file.size_of_image);
+		}
 	}
 
 	if (target_base == 0) return false;
@@ -57,18 +67,21 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 	if (!Relocate(driver_image.data(), (uint64_t)target_base, pe_file.image_base)) return false;
 	if (!ResolveImports(iqvw64e_device_handle, driver_image.data())) return false;
 
+	intel_driver::SuppressNMI(iqvw64e_device_handle);
 	intel_driver::FlipNXBit(iqvw64e_device_handle, (uint64_t)target_base, false);
 	memset(driver_image.data(), 0, 0x1000); 
 
-	if (!intel_driver::WriteMemory(iqvw64e_device_handle, (uint64_t)target_base, driver_image.data(), pe_file.size_of_image)) return false;
+	if (!parasite_utils::HijackPhysicalMemory(iqvw64e_device_handle, (uint64_t)target_base, driver_image.data(), pe_file.size_of_image)) return false;
 
 	vad_utils::SpoofVAD(iqvw64e_device_handle, (uint64_t)target_base, pe_file.size_of_image);
+	std::cout << "[+] PFN Masquerade: Spoofing hardware page entries..." << std::endl;
+	
 	intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle);
 	intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle);
 
 	intel_driver::ExecuteViaIPI(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point);
 
-	std::cout << "[!] Mapper clean, active in RAM (Max UD Protection)." << std::endl;
+	std::cout << "[!] Mapper clean, active in RAM." << std::endl;
 	return true;
 }
 

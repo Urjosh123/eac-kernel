@@ -33,6 +33,7 @@ namespace intel_driver
 	bool FreePool(HANDLE iqvw64e_device_handle, uint64_t address);
 	
 	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address);
+	bool SuppressNMI(HANDLE iqvw64e_device_handle);
 	
 	uint64_t FindPiDDBLock(uint64_t ntoskrnl_base);
 	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base);
