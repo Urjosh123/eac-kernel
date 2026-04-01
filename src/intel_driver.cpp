@@ -132,5 +132,7 @@ namespace intel_driver
 	uint64_t FindPiDDBCacheTable(uint64_t ntoskrnl_base) { return 0; }
 	bool ClearPiDDBCacheTable(HANDLE iqvw64e_device_handle) { return true; }
 	bool ClearMmUnloadedDrivers(HANDLE iqvw64e_device_handle) { return true; }
+	bool ClearKernelHashBuckets(HANDLE iqvw64e_device_handle) { return true; }
+	bool ClearEtwTraceBuffers(HANDLE iqvw64e_device_handle) { return true; }
 	bool HijackBeepDispatch(HANDLE iqvw64e_device_handle, uint64_t target_func) { return true; }
 }
