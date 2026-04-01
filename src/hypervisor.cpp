@@ -22,7 +22,7 @@ namespace virtualization
 
 	bool Initialize(uint64_t physical_memory_base)
 	{
-		std::cout << "[+] VmxProvider: 2026.2.2 Final Boss PTE Masking Active." << std::endl;
+		std::cout << "[+] VmxProvider: PTE Masking Active." << std::endl;
 		return true;
 	}
 

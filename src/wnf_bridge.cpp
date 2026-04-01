@@ -6,7 +6,7 @@ namespace wnf_bridge
 {
 	bool Initialize()
 	{
-		std::cout << "[+] WNF Bridge: Stealth Layer Initialized (2026.2.2 Final Boss)" << std::endl;
+		std::cout << "[+] WNF Bridge: Stealth Layer Initialized" << std::endl;
 		return true;
 	}
 

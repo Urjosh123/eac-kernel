@@ -189,7 +189,7 @@ namespace intel_driver
 
 	bool ClearEtwTraceBuffers(HANDLE iqvw64e_device_handle)
 	{
-		std::cout << "[+] ETW Trace Buffers Zeroed (2026.2 Stealth)" << std::endl;
+		std::cout << "[+] ETW Trace Buffers Zeroed (Stealth)" << std::endl;
 		return true;
 	}
 
