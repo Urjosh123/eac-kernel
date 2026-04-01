@@ -32,9 +32,16 @@ namespace virtualization
 		return true;
 	}
 
+	bool VmxProvider::VirtualizeRDTSC(uint64_t& val)
+	{
+		val -= 1000; 
+		return true;
+	}
+
 	bool VmxProvider::VirtualizeMSR(uint32_t msr, uint64_t& val)
 	{
 		if (msr == 0x3A) val &= ~(1 << 2); 
+		if (msr >= 0x480 && msr <= 0x491) val = 0; 
 		return true;
 	}
 
@@ -60,6 +67,12 @@ namespace virtualization
 	bool SvmProvider::VirtualizeCPUID(uint32_t& eax, uint32_t& ebx, uint32_t& ecx, uint32_t& edx)
 	{
 		if (eax == 0x80000001) ecx &= ~(1 << 2); 
+		return true;
+	}
+
+	bool SvmProvider::VirtualizeRDTSC(uint64_t& val)
+	{
+		val -= 1000; 
 		return true;
 	}
 
