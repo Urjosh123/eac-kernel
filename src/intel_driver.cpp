@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include "../include/service_utils.hpp"
 
 typedef struct _PHYSICAL_ADDRESS {
 	union {
@@ -34,7 +35,11 @@ namespace vulnerability_providers
 		if (utils::FileExists("iqvw64e.sys")) found_path = "iqvw64e.sys";
 		else if (utils::FileExists("C:\\Windows\\Temp\\iqvw64e.sys")) found_path = "C:\\Windows\\Temp\\iqvw64e.sys";
 		
-		if (found_path.empty()) return false;
+		if (found_path.empty()) {
+			std::cout << "[-] Error: iqvw64e.sys not found in current directory or C:\\Windows\\Temp\\" << std::endl;
+			std::cout << "[-] Please place the vulnerable Intel driver (iqvw64e.sys) in the same folder." << std::endl;
+			return false;
+		}
 
 		std::vector<uint8_t> driver_data;
 		if (!utils::ReadFileToBuffer(found_path, driver_data)) return false;
@@ -54,6 +59,9 @@ namespace vulnerability_providers
 		std::ofstream out(temp_path, std::ios::binary);
 		out.write(reinterpret_cast<char*>(driver_data.data()), driver_data.size());
 		out.close();
+
+		if (!service_utils::ServiceManager::RegisterDriver(current_service_name, temp_path)) return false;
+		if (!service_utils::ServiceManager::RunDriver(current_service_name)) return false;
 
 		iqvw64e_device_handle = CreateFileA(("\\\\.\\" + current_service_name).c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		return (iqvw64e_device_handle != INVALID_HANDLE_VALUE);
@@ -107,14 +115,23 @@ namespace vulnerability_providers
 
 namespace intel_driver
 {
-	void InstantCleanup() {}
-	bool Load() { return true; }
-	bool Unload() { return true; }
-	bool IsLoaded() { return false; }
-	HANDLE Open() { return INVALID_HANDLE_VALUE; }
+	vulnerability_providers::IntelProvider provider;
 
-	bool ReadMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) { return true; }
-	bool WriteMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) { return true; }
+	void InstantCleanup() { provider.Unload(); }
+	bool Load() { return provider.Load(); }
+	bool Unload() { return provider.Unload(); }
+	bool IsLoaded() { return provider.GetDeviceHandle() != INVALID_HANDLE_VALUE; }
+	HANDLE Open() { return provider.GetDeviceHandle(); }
+
+	bool ReadMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) 
+	{ 
+		return provider.ReadMemory(address, buffer, size); 
+	}
+
+	bool WriteMemory(HANDLE iqvw64e_device_handle, uint64_t address, void* buffer, uint32_t size) 
+	{ 
+		return provider.WriteMemory(address, buffer, size); 
+	}
 	
 	struct Pattern { const char* pattern; const char* mask; };
 	uint64_t PatternScan(uint64_t base, uint32_t size, const char* pattern, const char* mask);
@@ -129,7 +146,6 @@ namespace intel_driver
 	
 	uintptr_t AllocatePhysicalMemory(HANDLE iqvw64e_device_handle, uint32_t size) { return 0; }
 	bool FreePool(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
-	
 	bool ExecuteViaIPI(HANDLE iqvw64e_device_handle, uint64_t address) { return true; }
 	bool SuppressNMI(HANDLE iqvw64e_device_handle) { return true; }
 	

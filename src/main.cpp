@@ -13,6 +13,7 @@ int main(int argc, char* argv[])
 	if (argc < 2)
 	{
 		std::cout << "[-] Usage: mapper.exe <driver.sys> [--hijack]" << std::endl;
+		system("pause");
 		return -1;
 	}
 
@@ -58,6 +59,6 @@ int main(int argc, char* argv[])
 	intel_driver::Unload();
 
 	std::cout << "[+] Finished!" << std::endl;
-
+	system("pause");
 	return 0;
 }

@@ -78,7 +78,8 @@ bool kdmapper::MapDriver(HANDLE iqvw64e_device_handle, const std::string& driver
 	intel_driver::ClearPiDDBCacheTable(iqvw64e_device_handle);
 	intel_driver::ClearMmUnloadedDrivers(iqvw64e_device_handle);
 
-	intel_driver::ExecuteViaIPI(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point);
+	std::cout << "[+] Passing execution to DriverEntry(0x" << std::hex << target_base << ", 0x" << pe_file.size_of_image << ")..." << std::dec << std::endl;
+	intel_driver::CallKernelFunction(iqvw64e_device_handle, (uint64_t)target_base + pe_file.entry_point, (uint64_t)target_base, (uint32_t)pe_file.size_of_image);
 
 	return true;
 }
