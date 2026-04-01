@@ -53,7 +53,7 @@ Provide the target system module (.sys) as a parasitic payload:
 
 - **Target OS**: Windows 10/11 (Architecture: x64)
 - **Minimum Build**: 20H2 (Legacy)
-- **Verified Build**: 26200 (Latest)
+- **Verified Build**: 25H2 26200 (Latest)
 - **Compiler**: MSVC v143+ (C++17)
 
 ---
