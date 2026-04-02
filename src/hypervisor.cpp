@@ -20,6 +20,10 @@ namespace virtualization
 		uint64_t vmx_cr4 = __readcr4();
 		__writecr4(vmx_cr4 | (1 << 13));
 
+		uint64_t pin_controls;
+		__vmx_vmread(0x4000, &pin_controls); 
+		__vmx_vmwrite(0x4000, pin_controls | (1 << 3)); 
+
 		return true;
 	}
 
@@ -57,10 +61,41 @@ namespace virtualization
 		pte->Read = 1;
 		pte->Write = 0;
 		pte->Execute = executable ? 1 : 0;
+
+		uint64_t pfn_db = utils::PatternScan(utils::GetKernelModuleBase("ntoskrnl.exe"), 0x1000000, "\x48\x8B\x05\x00\x00\x00\x00\x48\x8B\x40\x00\x48\x8B\x48\x00", "xxx????xxx?xxx?");
+		if (pfn_db)
+		{
+			uint64_t pfn_index = gpa >> 12;
+			uint64_t pfn_entry_addr = pfn_db + (pfn_index * 0x30); 
+			EptUpdateFlags(pfn_entry_addr, false); 
+		}
+	}
+
+	void HandleMtf()
+	{
+		uint64_t proc_controls;
+		__vmx_vmread(0x4002, &proc_controls); 
+		__vmx_vmwrite(0x4002, proc_controls & ~(1 << 27)); 
+	}
+
+	void HandleSplitPageAccess(uint64_t gpa, uint64_t rip)
+	{
+		uint64_t proc_controls;
+		__vmx_vmread(0x4002, &proc_controls); 
+		__vmx_vmwrite(0x4002, proc_controls | (1 << 27)); 
 	}
 
 	void HandleEptViolation(uint64_t gpa, uint64_t exit_qualification)
 	{
+		uint64_t rip;
+		__vmx_vmread(0x681E, &rip); 
+
+		if (((rip & 0xFFF) + 15) > 0x1000) 
+		{
+			HandleSplitPageAccess(gpa, rip);
+			return;
+		}
+		
 		return;
 	}
 
@@ -102,6 +137,14 @@ namespace virtualization
 		}
 		
 		__vmx_vmlaunch(); 
+		
+		uint64_t current_eptp;
+		__vmx_vmread(0x201A, &current_eptp);
+
+		uint64_t invept_type = 1; 
+		struct { uint64_t eptp; uint64_t reserved; } descriptor = { current_eptp, 0 };
+		__vmx_invept(invept_type, &descriptor);
+
 		return true;
 	}
 
@@ -122,7 +165,11 @@ namespace virtualization
 	bool VmxProvider::VirtualizeRDTSC(uint64_t& val)
 	{
 		uint64_t current = __rdtsc();
-		val = current - calibration_offset;
+		uint32_t jitter = 0;
+		_rdrand32_step(&jitter);
+		jitter %= 20; 
+
+		val = current - calibration_offset + jitter;
 		
 		if (val <= last_tsc) val = last_tsc + 1;
 		last_tsc = val;

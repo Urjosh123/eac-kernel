@@ -4,6 +4,7 @@
 #include "../include/hvci_audit.hpp"
 #include "../include/utils.hpp"
 #include "../include/intel_driver.hpp"
+#include <intrin.h>
 
 namespace hvci_audit
 {
@@ -38,5 +39,15 @@ namespace hvci_audit
 	bool ValidateConsistency(uint64_t entry)
 	{
 		return (entry & (1ULL << 0)); 
+	}
+
+	bool PerformTLBIntegrityCheck(uint64_t target_gva)
+	{
+		uint64_t eptp_val;
+		__vmx_vmread(0x2012, &eptp_val); 
+		
+		uint64_t pfn_offset = (target_gva & 0xFFF);
+		
+		return (eptp_val != 0 && pfn_offset < 0x1000); 
 	}
 }
